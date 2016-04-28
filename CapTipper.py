@@ -23,7 +23,8 @@ import CTCore
 from CTConsole import console
 from CTServer import server
 from CTReport import Report
-import CTPlugin
+import CTPlugin,glob2
+import subprocess
 
 def main(args, pcap_file):
     if (args.update):
@@ -84,13 +85,17 @@ def main(args, pcap_file):
     else:
         try:
             CTPlugin.init_plugins()
-            
             interpreter = console()
             interpreter.cmdloop()
         except:
             print (CTCore.newLine + 'Exiting CapTipper')
             if (CTCore.web_server_turned_on):
                 CTCore.web_server.shutdown()
+def bulkpcapAnalysis(bulkDir):
+    for file in glob2.glob(bulkDir+"/*.pcap"):
+        print file
+        subprocess.call(["./CapTipper.py","-r", bulkDir,file,"-g"])
+    print "\nPCAP had analysed and reports generation completed.\n"
 
 if __name__ == "__main__":
     try:
@@ -98,6 +103,7 @@ if __name__ == "__main__":
         colorama.init()
 
         parser = argparse.ArgumentParser(usage=CTCore.USAGE, add_help=False)
+        parser.add_argument('-b','--bulk', nargs=1, metavar='BULK PATH', help='Bulk PCAP Analysis from folder', required=False,default= "",type=str)
         parser.add_argument("-h", "--help", action='help', help='Print this help message and exit')
         parser.add_argument('-p','--port', metavar='PORT', help='Set web server port', required=False, default=80, type=int)
         parser.add_argument('-d','--dump', nargs=1, metavar='FOLDER PATH', help='Dump all files and exit', required=False)
@@ -109,8 +115,11 @@ if __name__ == "__main__":
 
         args, pcap_file = parser.parse_known_args()
 
-        if len(pcap_file) != 1 and not args.update:
-            parser.print_help()
+        if args.bulk != "":
+            bulkpcapAnalysis(args.bulk[0])
+        elif len(pcap_file) != 1 and not args.update:
+            interpreter = console()
+            interpreter.cmdloop()
         else:
             main(args, pcap_file)
 

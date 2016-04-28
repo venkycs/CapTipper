@@ -15,7 +15,6 @@ import os
 import time
 import hashlib
 import sys
-
 import CTCore
 from CTCore import hexdump
 from CTCore import colors
@@ -25,6 +24,7 @@ from pescanner import PEScanner
 
 newLine = os.linesep
 DEFAULT_BODY_SIZE = 256
+
 
 def get_id_size(line):
     l = line.split(" ")
@@ -128,10 +128,10 @@ class console(cmd.Cmd, object):
     """CapTipper console interpreter."""
 
     prompt = colors.SKY + 'CT> ' + colors.END
-    intro = "Starting CapTipper Interpreter" + newLine + \
-            "Type 'open <conversation id>' to open address in browser" + newLine + \
-            "Type 'hosts' to view traffic flow" + newLine + \
-            "Type 'help' for more options" + newLine
+    intro = "Starting CapTipper Interpreter" + newLine 
+            # "Type 'open <conversation id>' to open address in browser" + newLine + \
+            # "Type 'hosts' to view traffic flow" + newLine + \
+            # "Type 'help' for more options" + newLine
 
     def __init__(self):
         super(console, self).__init__()
@@ -642,6 +642,11 @@ class console(cmd.Cmd, object):
                 print ""
         except Exception,e:
             print str(e)
+    def do_pwd(self,line):
+        print  os.getcwd()
+    def help_pwd(self):
+        print newLine + "Print current working directory"
+        print newLine + "Usage: pwd" + newLine
 
     def help_slice(self):
         print newLine + "Returns bytes from offset in given length"
@@ -714,6 +719,68 @@ class console(cmd.Cmd, object):
         except Exception, e:
             print str(e)
 
+    def do_load(self, line):
+        # try:
+        #     CTCore.load_pcap(line)
+        # except Exception, e:
+        #     print str(e)
+        try:
+            l = line.split(" ")
+            if (l[0] == ""):
+                self.help_load()
+            else:
+                CTCore.load_pcap(line)
+                exit(0)
+        except Exception,e:
+            print str(e)
+
+    def do_wire(self,line):
+        try:
+            CTCore.load_wire()
+        except Exception, e:
+            print str(e)
+
+    def do_ls(self, line):
+        try:
+            l = line.split(" ")
+            if (l[0] == ""):
+                CTCore.list_pcap(".")
+            else:
+                CTCore.list_pcap(os.path.expanduser(l[0]))
+        except Exception,e:
+            print str(e)
+
+    def help_ls(self):
+        print newLine + "Shows list of PCAPS from ./pcaps/ folder"
+        print newLine + "Which can be directly loaded by using 'load path_to_pcap_file'"
+        print newLine + "Example: load malware.pcap"
+        print newLine
+
+    def do_cd(self, line):
+        try:
+            l = line.split(" ")
+            if (l[0] == ""):
+                os.chdir(".")
+            else:
+                os.chdir(os.path.expanduser(l[0]))
+        except Exception,e:
+            print str(e)
+
+    def help_cd(self):
+        print newLine + "Changes current directory for loading pcaps."
+
+    def help_wire(self):
+        print newLine + "Opens current pcap samples in wireshark"
+        print newLine + "Opens current Analysis pcapfile in Wireshark"
+        print newLine + "Example: load"
+        print newLine
+
+    def help_load(self):
+        print newLine + "Load PCAP for Analysis"
+        print newLine + "Usage: load file_id obtained from ls command starting from 1"
+        print newLine + "Usage: load path_to_pcap_file"
+        print newLine + "Example: load /users/root/desktop/malware.pcap"
+        print newLine
     def do_strings(self, line):
         try:
             l = line.split(" ")

@@ -31,6 +31,7 @@ class HttpPrinter(object):
         self.remote_host = remote_host
         self.uri = ""
         self.req = ""
+        self.user_agent = ""
         self.res_body = ""
         self.orig_resp = ""
         self.orig_chunked_resp = ""
@@ -69,6 +70,7 @@ class HttpPrinter(object):
             self.referer = req_header.referer
             self.method = req_header.method
             self.time = req_header.time
+            self.user_agent = req_header.user_agent
 
             mime, charset = utils.parse_content_type(req_header.content_type)
             # usually charset is not set in http post

@@ -9,7 +9,6 @@
 #          CapTipper is a free software under the GPLv3 License
 #
 
-
 from collections import namedtuple
 import StringIO
 import json
@@ -22,8 +21,10 @@ import gzip
 import re
 import sys
 import zipfile
+import glob
 
 from CTMagic import Whatype
+import subprocess
 
 newLine = os.linesep
 conversations = []
@@ -32,6 +33,7 @@ Errors = []
 hosts = collections.OrderedDict()
 request_logs = []
 plugins = []
+files = []
 plugins_folder = "plugins/"
 pcap_file = ""
 VERSION = "0.3"
@@ -40,11 +42,12 @@ ABOUT = "CapTipper v" + VERSION + " b" + BUILD + " - Malicious HTTP traffic expl
         "Copyright 2015 Omri Herscovici <omriher@gmail.com>" + newLine
 
 USAGE = ("CapTipper.py <pcap_file> [options]" + newLine + newLine +
-        "Examples: CapTipper.py ExploitKit.pcap           -     explore and start server on port 80" + newLine +
-        "          CapTipper.py ExploitKit.pcap -p 1234   -     explore and start server on port 1234" + newLine +
-        "          CapTipper.py ExploitKit.pcap -d /tmp/  -     dumps all files and exit" + newLine +
-        "          CapTipper.py ExploitKit.pcap -r /tmp/  -     create json & html report and exit" + newLine +
-        "          CapTipper.py ExploitKit.pcap -s        -     explore without web server" + newLine)
+        "Examples: CapTipper.py                              -     explore and start CapTipper" + newLine +
+        "          CapTipper.py ExploitKit.pcap -p 1234      -     explore and start server on port 1234" + newLine +
+        "          CapTipper.py ExploitKit.pcap -d /tmp/     -     dumps all files and exit" + newLine +
+        "          CapTipper.py ExploitKit.pcap -r /tmp/     -     create json & html report and exit" + newLine +
+        "          CapTipper.py ExploitKit.pcap -b ./pcaps/  -     bulk pcap analysis" + newLine +
+        "          CapTipper.py ExploitKit.pcap -s           -     explore without web server" + newLine)
 
 # WS configurations
 web_server_turned_on = False
@@ -86,7 +89,7 @@ class client_struct:
         self.headers = collections.OrderedDict()
         self.headers["IP"] = ""
         self.headers["MAC"] = ""
-        self.ignore_headers = ['ACCEPT','ACCEPT-ENCODING','ACCEPT-LANGUAGE','CONNECTION','HOST','REFERER', \
+        self.ignore_headers = ['ACCEPT','ACCEPT-ENCODING','ACCEPT-LANGUAGE','CONNECTION','USER-AGENT','HOST','REFERER', \
                                'CACHE-CONTROL','CONTENT-TYPE', 'COOKIE', 'CONTENT-LENGTH', 'X-REQUESTED-WITH', \
                                'IF-MODIFIED-SINCE','IF-NONE-MATCH','ORIGIN','ACCEPT-ASTEROPE','IF-UNMODIFIED-SINCE']
 
@@ -240,7 +243,6 @@ def check_order(Conv):
     return True
 
 def finish_conversation(self):
-
     if not (check_duplicate_url(self.host, self.uri)):
 
         #if check_duplicate_uri(self.uri):
@@ -248,7 +250,7 @@ def finish_conversation(self):
 
         obj_num = len(conversations)
         conversations.append(namedtuple('Conv',
-            ['id','server_ip_port', 'uri','req','res_body','res_head','res_num','res_type','host','referer', \
+            ['id','server_ip_port', 'uri','req','res_body','res_head','res_num','user_agent','res_type','host','referer', \
             'filename','method','redirect_to','req_microsec', 'res_len','magic_name', 'magic_ext']))
 
 
@@ -261,6 +263,7 @@ def finish_conversation(self):
         conversations[obj_num].redirect_to = self.redirect_to
         conversations[obj_num].short_uri = getShortURI(self.uri)
         conversations[obj_num].req = self.req
+        conversations[obj_num].user_agent = self.user_agent
         conversations[obj_num].res_body = self.res_body
 
 
@@ -279,6 +282,7 @@ def finish_conversation(self):
         conversations[obj_num].orig_resp = self.orig_resp
         conversations[obj_num].res_head = self.res_head
         conversations[obj_num].res_num = self.res_num
+        
 
         if ";" in self.res_type:
             conversations[obj_num].res_type = self.res_type[:self.res_type.find(";")]
@@ -315,7 +319,7 @@ def finish_conversation(self):
 def show_conversations():
     if (b_use_short_uri):
         alert_message("Displaying shortened URI paths" + newLine, msg_type.INFO)
-
+    #print "("+conv.user_agent +")" + colors.PINK
     for cnt, conv in enumerate(conversations):
         try:
             typecolor = colors.END
@@ -328,12 +332,13 @@ def show_conversations():
             elif ("image" in conv.res_type):
                 typecolor = colors.GREEN
 
-            print str(conv.id) + ": " + colors.PINK,
+            print str(conv.id) +" : "+ colors.RED +(conv.user_agent)+ colors.END +": " + colors.PINK,
             if (b_use_short_uri):
                 print conv.short_uri,
             else:
                 print conv.uri,
             print colors.END + " -> " + conv.res_type,
+
             if (conv.filename != ""):
                 print typecolor + "(" + conv.filename.rstrip() + ")" + colors.END + " [" + str(fmt_size(conv.res_len)) + "]",
 
@@ -505,6 +510,30 @@ def get_strings(content):
     strings = re.findall("[\x1f-\x7e]{5,}", content)
     strings += [str(ws.decode("utf-16le")) for ws in re.findall("(?:[\x1f-\x7e][\x00]){5,}", content)]
     return strings
+
+def load_pcap(pcap_file):
+    if os.path.exists(pcap_file):
+        subprocess.call(["python",os.path.dirname(os.path.realpath(__file__))+"/CapTipper.py", pcap_file,"-g"])
+    else:
+        subprocess.call(["python",os.path.dirname(os.path.realpath(__file__))+"/CapTipper.py", files[int(pcap_file)-1],"-g"])
+    return
+
+def load_wire():
+    if os.path.exists(pcap_file):
+        subprocess.Popen(["wireshark","-r", pcap_file])
+    else:
+        print "File not yet opened in CapTipper"
+    return
+
+def list_pcap(pcapDir):
+    i =1
+    files[:]=[]
+    print "Listing all files from", pcapDir
+    for file in glob.glob(pcapDir+"/*"):
+        files.append(file)
+        print str(i)+":  "+os.getcwd() + file.replace("./","/")
+        i=i+1
+    return
 
 def get_request_size(id, size, full_request=False):
 

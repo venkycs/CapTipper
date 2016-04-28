@@ -21,6 +21,7 @@ class HttpRequestHeader(object):
         self.content_len = 0
         self.method = b''
         self.host = b''
+        self.user_agent = b''
         self.uri = b''
         self.transfer_encoding = b''
         self.content_encoding = b''
@@ -196,6 +197,7 @@ class HttpParser(object):
         if b'chunked' in header_dict[b"transfer-encoding"]:
             req_header.chunked = True
         req_header.content_type = header_dict[b'content-type']
+        req_header.user_agent = header_dict[b'user-agent']
         req_header.compress = utils.get_compress_type(header_dict[b"content-encoding"])
         req_header.host = header_dict[b"host"]
         if b'expect' in header_dict:
